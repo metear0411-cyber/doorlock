@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#E7E3DB">
+<title>도어락 연습</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+  :root{
+    --wall:#E7E3DB; --wall-deep:#D6D0C4; --ink:#2B2A27; --mute:#8A857B;
+    --glass:#14181D; --glass-hi:#1E242B; --rim:#2A313A;
+    --lit:#5CC8FF; --dim:#2C333B;
+    --ok:#3DBE7A; --bad:#E0604F;
+    --wood:#8E6A45; --wood-deep:#6E4F31; --light:#FFE7B5;
+    --k: clamp(64px, 13vmin, 118px);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;height:100%;background:var(--wall);color:var(--ink);
+    font-family:Pretendard,"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif;
+    -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;overflow:hidden;}
+  #app{height:100%;display:flex;flex-direction:column;
+    padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    background:linear-gradient(180deg,var(--wall) 0%,var(--wall) 78%,var(--wall-deep) 100%);}
+  .top{display:flex;justify-content:space-between;align-items:center;padding:12px 20px 0;}
+  .title{font-size:clamp(15px,2.2vmin,20px);color:var(--mute);font-weight:500;}
+  .gear{background:none;border:0;color:#B9B3A7;font-size:22px;padding:8px 12px;touch-action:none;border-radius:12px;}
+  .gear.hold{color:var(--lit);background:rgba(92,200,255,.15);}
+
+  .stage{flex:1;display:flex;align-items:center;justify-content:center;gap:clamp(20px,6vmin,80px);padding:0 4vmin 3vmin;}
+  @media (orientation:portrait){ .stage{flex-direction:column;gap:clamp(12px,3vmin,28px);} }
+
+  /* ── door ── */
+  .doorwrap{display:flex;flex-direction:column;align-items:center;gap:10px;}
+  .frame{position:relative;width:clamp(120px,24vmin,230px);height:clamp(220px,48vmin,440px);perspective:1100px;
+    background:#B8AE9E;border:clamp(7px,1.3vmin,12px) solid #CFC6B7;border-bottom-width:0;border-radius:4px 4px 0 0;
+    box-shadow:0 30px 50px -20px rgba(60,50,35,.35);}
+  @media (orientation:portrait){ .frame{width:clamp(96px,16vmin,150px);height:clamp(170px,32vmin,290px);} }
+  .doorway{position:absolute;inset:0;background:radial-gradient(ellipse at 35% 45%,#FFF6DC 0%,var(--light) 45%,#C9A468 100%);
+    opacity:0;transition:opacity .9s ease .35s;}
+  .open .doorway{opacity:1;}
+  .door{position:absolute;inset:0;transform-origin:left center;
+    background:linear-gradient(90deg,var(--wood-deep),var(--wood) 35%,var(--wood) 65%,var(--wood-deep));
+    transition:transform 1.5s cubic-bezier(.2,.75,.2,1);backface-visibility:hidden;}
+  .door::before,.door::after{content:"";position:absolute;left:18%;right:18%;border:2px solid rgba(0,0,0,.18);border-radius:2px;
+    box-shadow:inset 0 0 0 2px rgba(255,255,255,.06);}
+  .door::before{top:8%;height:36%;}
+  .door::after{bottom:8%;height:36%;}
+  .open .door{transform:rotateY(-80deg);}
+  .handle{position:absolute;right:10%;top:51%;width:22%;height:3.2%;background:linear-gradient(180deg,#E6E9EC,#A9B0B7);
+    border-radius:3px;transform:translateY(-50%);box-shadow:0 2px 4px rgba(0,0,0,.45);}
+  .handle::before{content:"";position:absolute;right:0;top:-120%;width:28%;height:340%;background:#B7BEC5;border-radius:3px;}
+  .status{min-height:1.5em;font-size:clamp(17px,2.8vmin,26px);color:var(--ok);font-weight:700;}
+
+  /* ── lock panel ── */
+  .panelwrap{display:flex;flex-direction:column;align-items:center;gap:clamp(10px,1.8vmin,18px);}
+  .prompt{min-height:1.5em;font-size:clamp(21px,3.7vmin,38px);font-weight:600;text-align:center;color:var(--ink);line-height:1.35;}
+  .seq{display:flex;gap:clamp(6px,1.2vmin,12px);min-height:clamp(46px,8.2vmin,74px);}
+  .sq{width:clamp(46px,8.2vmin,74px);height:clamp(46px,8.2vmin,74px);border-radius:14px;background:#FFFFFF;border:2px solid #D8D2C6;
+    display:flex;align-items:center;justify-content:center;font-size:clamp(25px,4.5vmin,42px);font-weight:700;color:#4A463F;}
+  .sq.done{background:#E4F6EC;border-color:var(--ok);color:#22855A;}
+  .sq.cur{background:#E4F3FD;border-color:#2E9FE0;color:#0F5B8E;box-shadow:0 0 0 4px rgba(92,200,255,.35);}
+
+  .lock{position:relative;background:linear-gradient(165deg,var(--glass-hi),var(--glass) 55%,#0F1317);
+    border-radius:26px;padding:clamp(16px,2.8vmin,30px) clamp(16px,2.8vmin,30px) clamp(12px,2.2vmin,22px);
+    border:1px solid var(--rim);touch-action:none;
+    box-shadow:0 28px 60px -18px rgba(30,26,20,.55), inset 0 1px 0 rgba(255,255,255,.07);}
+  .lock::before{content:"";position:absolute;inset:0;border-radius:26px;pointer-events:none;
+    background:linear-gradient(115deg,rgba(255,255,255,.07) 0%,rgba(255,255,255,0) 38%);}
+  .lockhead{display:flex;justify-content:center;align-items:center;gap:10px;margin-bottom:clamp(10px,1.8vmin,18px);height:12px;}
+  .led{width:10px;height:10px;border-radius:50%;background:var(--dim);transition:all .3s;}
+  .led.on{background:var(--lit);box-shadow:0 0 10px var(--lit);}
+  .led.ok{background:var(--ok);box-shadow:0 0 12px var(--ok);}
+  .led.bad{background:var(--bad);box-shadow:0 0 12px var(--bad);}
+
+  .keys{display:grid;grid-template-columns:repeat(3,var(--k));gap:clamp(9px,1.7vmin,17px);}
+  .key{width:var(--k);height:var(--k);border-radius:20px;border:1px solid #232B34;
+    background:linear-gradient(180deg,#171D24,#10151B);color:var(--lit);
+    font-size:calc(var(--k)*.44);font-weight:600;display:flex;align-items:center;justify-content:center;
+    text-shadow:0 0 10px rgba(92,200,255,.55);transition:transform .08s,box-shadow .25s,color .35s,background .35s;}
+  .key.sym{font-size:calc(var(--k)*.40);}
+  .asleep .key{color:var(--dim);text-shadow:none;border-color:#1A2028;}
+  .key.pressed{transform:scale(.94);background:#23394B;color:#FFFFFF;}
+  .key.next-strong{color:#FFFFFF;background:linear-gradient(180deg,#1F5476,#153B53);
+    animation:glow 1.2s ease-in-out infinite;}
+  .key.next-soft{color:#E6F6FF;box-shadow:0 0 0 2px rgba(92,200,255,.55),0 0 14px rgba(92,200,255,.35);}
+  @keyframes glow{
+    0%,100%{box-shadow:0 0 0 3px var(--lit),0 0 20px rgba(92,200,255,.5);}
+    50%{box-shadow:0 0 0 5px #B6E6FF,0 0 42px rgba(92,200,255,.95);}
+  }
+  .pulse{animation:pulse 2.2s ease-in-out infinite;}
+  @keyframes pulse{
+    0%,100%{box-shadow:0 28px 60px -18px rgba(30,26,20,.55),0 0 0 0 rgba(92,200,255,0);}
+    50%{box-shadow:0 28px 60px -18px rgba(30,26,20,.55),0 0 0 8px rgba(92,200,255,.28);}
+  }
+  .shake{animation:shake .4s;}
+  @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-9px)}75%{transform:translateX(9px)}}
+  .dots{display:flex;justify-content:center;gap:11px;min-height:12px;margin-top:clamp(10px,1.8vmin,18px);}
+  .dots span{width:11px;height:11px;border-radius:50%;background:var(--lit);box-shadow:0 0 8px var(--lit);}
+  .next{font-size:clamp(13px,2vmin,18px);color:var(--mute);min-height:1.4em;}
+  @media (prefers-reduced-motion:reduce){ .pulse,.key.next-strong{animation:none;} .door{transition-duration:.6s;} }
+
+  /* ── settings ── */
+  .modal{position:fixed;inset:0;background:rgba(43,42,39,.55);display:flex;align-items:center;justify-content:center;padding:16px;z-index:10;}
+  .modal.hidden{display:none;}
+  .sheet{background:#FAF8F4;color:var(--ink);border-radius:22px;width:min(720px,100%);max-height:100%;display:flex;flex-direction:column;overflow:hidden;
+    -webkit-user-select:text;user-select:text;box-shadow:0 40px 80px -30px rgba(0,0,0,.5);}
+  .sheet-head{display:flex;justify-content:space-between;align-items:center;padding:16px 22px;border-bottom:1px solid #E5E0D6;}
+  .sheet-head h2{margin:0;font-size:21px;font-weight:700;}
+  .sheet-body{overflow:auto;padding:6px 22px 22px;-webkit-overflow-scrolling:touch;}
+  .grp{padding:16px 0;border-bottom:1px solid #ECE7DD;}
+  .grp:last-child{border-bottom:0;}
+  .grp h3{margin:0 0 8px;font-size:15px;color:var(--mute);font-weight:600;}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:10px 0;font-size:17px;}
+  .row > span:first-child{flex:1;line-height:1.4;}
+  input[type=text],select{background:#FFFFFF;border:1px solid #D8D2C6;color:var(--ink);font:inherit;font-size:18px;padding:10px 12px;border-radius:12px;min-width:120px;}
+  #sCode{letter-spacing:.32em;font-weight:700;text-align:center;width:170px;}
+  .sw{appearance:none;-webkit-appearance:none;width:56px;height:32px;border-radius:16px;background:#CFC8BB;position:relative;transition:.2s;flex:none;margin:0;}
+  .sw:checked{background:var(--ok);}
+  .sw::after{content:"";position:absolute;top:3px;left:3px;width:26px;height:26px;border-radius:50%;background:#fff;transition:.2s;box-shadow:0 1px 3px rgba(0,0,0,.3);}
+  .sw:checked::after{left:27px;}
+  .seg{display:flex;border:1px solid #D8D2C6;border-radius:12px;overflow:hidden;background:#fff;}
+  .seg button{background:transparent;color:#4A463F;border:0;font:inherit;font-size:18px;font-weight:600;padding:10px 20px;}
+  .seg button.on{background:#1F5476;color:#fff;}
+  .btn{background:#FFFFFF;color:var(--ink);border:1px solid #D8D2C6;border-radius:12px;font:inherit;font-size:16px;font-weight:600;padding:12px 16px;margin-top:8px;}
+  .btn.ghost{background:none;border-color:transparent;color:#1F5476;}
+  .btn.warn{color:#B4412F;}
+  .val{color:#1F5476;font-weight:700;text-align:right;}
+  .stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin:6px 0 12px;}
+  .stat{background:#FFFFFF;border:1px solid #ECE7DD;border-radius:14px;padding:10px 14px;}
+  .stat b{display:block;font-size:22px;margin:2px 0;}
+  .stat small{color:var(--mute);font-size:13px;}
+  .log{font-size:14px;color:#4A463F;max-height:180px;overflow:auto;border:1px solid #ECE7DD;border-radius:12px;padding:6px 12px;background:#fff;}
+  .log div{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed #ECE7DD;}
+  .log div:last-child{border-bottom:0;}
+  .hint{font-size:14px;color:var(--mute);line-height:1.55;margin:10px 0 0;}
+  .msg{font-size:14px;color:#B4412F;min-height:1.2em;margin-top:4px;}
+</style>
+</head>
+<body>
+<div id="app">
+  <header class="top">
+    <div class="title">도어락 연습</div>
+    <button id="gear" class="gear" aria-label="설정 (2초 길게 누르기)">&#9881;</button>
+  </header>
+
+  <main class="stage">
+    <section class="doorwrap">
+      <div class="frame" id="frame">
+        <div class="doorway"></div>
+        <div class="door"><div class="handle"></div></div>
+      </div>
+      <div class="status" id="status"></div>
+    </section>
+
+    <section class="panelwrap">
+      <div class="prompt" id="prompt"></div>
+      <div class="seq" id="seq"></div>
+      <div class="lock" id="lock">
+        <div class="lockhead"><div class="led" id="led"></div></div>
+        <div class="keys" id="keys"></div>
+        <div class="dots" id="dots"></div>
+      </div>
+      <div class="next" id="nextdue"></div>
+    </section>
+  </main>
+</div>
+
+<div id="settings" class="modal hidden">
+  <div class="sheet">
+    <div class="sheet-head">
+      <h2>설정</h2>
+      <button id="closeS" class="btn ghost">닫기</button>
+    </div>
+    <div class="sheet-body">
+
+      <section class="grp">
+        <h3>우리 집 도어락과 똑같이</h3>
+        <label class="row"><span>비밀번호 (숫자 4~8자리)</span><input type="text" id="sCode" inputmode="numeric" maxlength="8"></label>
+        <div class="msg" id="sCodeMsg"></div>
+        <label class="row"><span>깨우기 터치<br><small style="color:var(--mute)">누르기 전에 화면을 한 번 터치해야 켜지는 방식</small></span><input type="checkbox" id="sWake" class="sw"></label>
+        <div class="row"><span>번호 다음에 마지막으로 누르는 키</span>
+          <div class="seg" id="sEnd"><button data-v="#">#</button><button data-v="*">*</button><button data-v="none">없음</button></div>
+        </div>
+      </section>
+
+      <section class="grp">
+        <h3>도와주는 정도</h3>
+        <div class="row"><span>힌트 단계</span>
+          <select id="sHint">
+            <option value="auto">자동 (성공하면 조금씩 줄임)</option>
+            <option value="3">3단계 · 다음 키를 밝게 알려줌 + 음성</option>
+            <option value="2">2단계 · 다음 키를 살짝 알려줌</option>
+            <option value="1">1단계 · 번호만 보여줌</option>
+            <option value="0">0단계 · 실제 도어락과 같게</option>
+          </select>
+        </div>
+        <div class="row"><span>자동일 때, 연속으로 몇 번 성공하면 한 단계 낮출까요</span>
+          <select id="sStep"><option value="2">2번</option><option value="3">3번</option><option value="5">5번</option></select>
+        </div>
+        <div class="row"><span>지금 단계</span><span id="sLevelNow" class="val"></span></div>
+        <button id="sResetLevel" class="btn">3단계부터 다시 시작</button>
+      </section>
+
+      <section class="grp">
+        <h3>소리와 진동</h3>
+        <label class="row"><span>키 소리·문 열리는 소리</span><input type="checkbox" id="sSound" class="sw"></label>
+        <label class="row"><span>진동</span><input type="checkbox" id="sVib" class="sw"></label>
+        <label class="row"><span>음성 안내 (3단계에서 순서를 말해줌)</span><input type="checkbox" id="sVoice" class="sw"></label>
+      </section>
+
+      <section class="grp">
+        <h3>연습 기록</h3>
+        <div class="stats" id="sStats"></div>
+        <div class="log" id="sLog"></div>
+        <button id="sClearLog" class="btn warn">기록 지우기</button>
+      </section>
+
+      <section class="grp">
+        <h3>화면</h3>
+        <button id="sFull" class="btn">전체 화면으로</button>
+        <p class="hint">태블릿 크롬 메뉴에서 "홈 화면에 추가"를 누르면 앱처럼 열립니다. 이 설정 창은 오른쪽 위 톱니를 2초간 길게 누르면 열립니다.</p>
+      </section>
+
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const KEYS = ['1','2','3','4','5','6','7','8','9','*','0','#'];
+  const KO = {'0':'영','1':'일','2':'이','3':'삼','4':'사','5':'오','6':'육','7':'칠','8':'팔','9':'구'};
+  const INTERVALS = [5, 10, 20, 40, 60, 120, 240, 480]; // 분 — 간격 회상
+  const LEVEL_NAME = {3:'3단계 · 다음 키를 밝게 알려줌', 2:'2단계 · 다음 키를 살짝 알려줌', 1:'1단계 · 번호만 보여줌', 0:'0단계 · 실제 도어락과 같게'};
+  const DEFAULTS = {code:'7812', wake:true, endKey:'#', hint:'auto', autoStep:3, sound:true, vibrate:true, voice:true};
+
+  // ── 저장 (태블릿 브라우저에 저장, 불가한 환경에서는 이 화면을 여는 동안만 유지) ──
+  const mem = {};
+  const store = {
+    get(k, d){ try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch(e){ return k in mem ? mem[k] : d; } },
+    set(k, v){ mem[k] = v; try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
+  };
+  let settings = Object.assign({}, DEFAULTS, store.get('dl_settings', {}));
+  let prog = Object.assign({level:3, streak:0, nextDue:0, log:[]}, store.get('dl_progress', {}));
+
+  let state = settings.wake ? 'sleep' : 'ready';   // sleep | ready | success | fail
+  let input = '';
+  let idleTimer = null, resetTimer = null, wakeAt = 0, settingsOpen = false;
+
+  const $ = id => document.getElementById(id);
+  const lockEl = $('lock'), keysEl = $('keys'), promptEl = $('prompt'), seqEl = $('seq'),
+        dotsEl = $('dots'), ledEl = $('led'), frameEl = $('frame'), statusEl = $('status'),
+        nextEl = $('nextdue'), gearEl = $('gear'), settingsEl = $('settings');
+
+  // ── 도우미 ──
+  const level = () => settings.hint === 'auto' ? prog.level : Number(settings.hint);
+  const endKeyName = k => k === '#' ? '샵' : k === '*' ? '별' : '';
+  const fullSeq = () => settings.code.split('').concat(settings.endKey !== 'none' ? [settings.endKey] : []);
+  const expectedNext = () => input.length < settings.code.length ? settings.code[input.length] : (settings.endKey !== 'none' ? settings.endKey : null);
+  const fmtTime = t => new Date(t).toLocaleTimeString('ko-KR', {hour:'numeric', minute:'2-digit'});
+  const fmtDateTime = t => new Date(t).toLocaleString('ko-KR', {month:'numeric', day:'numeric', hour:'numeric', minute:'2-digit'});
+
+  // ── 소리·진동·음성 ──
+  let ac = null;
+  function audio(){
+    if (!settings.sound) return null;
+    try {
+      if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
+      if (ac.state === 'suspended') ac.resume();
+      return ac;
+    } catch(e){ return null; }
+  }
+  function tone(freq, dur, type, gain, when){
+    const c = audio(); if (!c) return;
+    type = type || 'sine'; gain = gain == null ? 0.15 : gain; when = when || 0;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = type; o.frequency.value = freq;
+    const t0 = c.currentTime + when;
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.exponentialRampToValueAtTime(gain, t0 + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    o.connect(g); g.connect(c.destination);
+    o.start(t0); o.stop(t0 + dur + 0.05);
+  }
+  const sfx = {
+    key(){ tone(1046, 0.09, 'square', 0.05); },
+    wake(){ tone(660, 0.12); tone(880, 0.14, 'sine', 0.15, 0.12); },
+    clear(){ tone(520, 0.08); },
+    ok(){ [523, 659, 784, 1046].forEach((f, i) => tone(f, 0.28, 'sine', 0.18, i * 0.13)); },
+    bad(){ tone(220, 0.18, 'sawtooth', 0.07); tone(220, 0.18, 'sawtooth', 0.07, 0.26); }
+  };
+  function buzz(p){ if (settings.vibrate && navigator.vibrate) { try { navigator.vibrate(p); } catch(e){} } }
+  function say(text){
+    if (!settings.voice || !('speechSynthesis' in window)) return;
+    try {
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = 'ko-KR'; u.rate = 0.88;
+      speechSynthesis.speak(u);
+    } catch(e){}
+  }
+
+  // ── 그리기 ──
+  function render(){
+    const lv = level();
+    const awake = state !== 'sleep';
+    lockEl.classList.toggle('asleep', !awake);
+    lockEl.classList.toggle('pulse', !awake && lv >= 3);
+
+    let p = '';
+    if (state === 'success') p = '문이 열렸어요!';
+    else if (state === 'fail') p = lv >= 1 ? '괜찮아요, 다시 한번 해볼까요?' : '다시 한번 해볼까요?';
+    else if (lv >= 1) {
+      if (state === 'sleep') p = '손바닥으로 화면을 살짝 눌러 주세요';
+      else if (input.length < settings.code.length) p = '번호를 순서대로 눌러 주세요';
+      else if (settings.endKey !== 'none') p = '이제 ' + endKeyName(settings.endKey) + '(' + settings.endKey + ')을 눌러 주세요';
+    }
+    promptEl.textContent = p;
+
+    seqEl.innerHTML = '';
+    if (lv >= 1 && state !== 'success' && state !== 'fail') {
+      fullSeq().forEach((ch, i) => {
+        const d = document.createElement('div');
+        d.className = 'sq'; d.textContent = ch;
+        if (lv >= 2 && awake) {
+          if (i < input.length) d.classList.add('done');
+          else if (i === input.length) d.classList.add('cur');
+        }
+        seqEl.appendChild(d);
+      });
+    }
+
+    const nx = (awake && state === 'ready' && lv >= 2) ? expectedNext() : null;
+    keysEl.querySelectorAll('.key').forEach(b => {
+      b.classList.remove('next-strong', 'next-soft');
+      if (nx !== null && b.dataset.k === nx) b.classList.add(lv >= 3 ? 'next-strong' : 'next-soft');
+    });
+
+    dotsEl.innerHTML = '';
+    if (awake && state === 'ready') for (let i = 0; i < input.length; i++) dotsEl.appendChild(document.createElement('span'));
+
+    ledEl.className = 'led' + (state === 'success' ? ' ok' : state === 'fail' ? ' bad' : awake ? ' on' : '');
+    frameEl.classList.toggle('open', state === 'success');
+    statusEl.textContent = '';
+    nextEl.textContent = (prog.nextDue && prog.nextDue > Date.now()) ? '다음 연습은 ' + fmtTime(prog.nextDue) + '쯤이 좋아요' : '';
+  }
+
+  // ── 동작 ──
+  function armIdle(){
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => {
+      if (state !== 'ready') return;
+      input = '';
+      if (settings.wake) state = 'sleep';
+      render();
+      if (state === 'ready') armIdle();
+    }, 12000);
+  }
+  function wake(){
+    state = 'ready'; input = ''; wakeAt = Date.now();
+    sfx.wake(); buzz(25); render(); armIdle();
+    const lv = level();
+    if (lv >= 3) say(settings.code.split('').map(c => KO[c] || c).join(', ') + ' 순서로 눌러 주세요');
+    else if (lv === 2) say('번호를 눌러 주세요');
+  }
+  function press(k){
+    if (state === 'success' || state === 'fail') return;
+    if (state === 'sleep') { wake(); return; }
+    if (Date.now() - wakeAt < 450) return;          // 깨우기 터치 직후의 손바닥 접촉은 무시
+    armIdle();
+    const lv = level();
+    const isEnd = settings.endKey !== 'none' && k === settings.endKey;
+
+    if (isEnd) {
+      sfx.key(); buzz(20);
+      if (input.length === 0) return;
+      judge(); return;
+    }
+    if (k === '*' || k === '#') {                    // 끝 키가 아닌 특수키는 지우기 역할
+      input = ''; sfx.clear(); buzz(20); render(); return;
+    }
+    sfx.key(); buzz(20);
+    if (lv >= 2 && settings.code[input.length] !== k) {   // 힌트 단계에서는 틀리면 조용히 처음으로
+      input = '';
+      lockEl.classList.add('shake'); setTimeout(() => lockEl.classList.remove('shake'), 400);
+      if (lv >= 3) say('다시, ' + (KO[settings.code[0]] || settings.code[0]) + '부터 눌러 주세요');
+      render(); return;
+    }
+    input += k;
+    if (settings.endKey === 'none') {
+      if (input.length >= settings.code.length) { judge(); return; }
+    } else if (input.length === settings.code.length && lv >= 3) {
+      say('이제 ' + endKeyName(settings.endKey) + '을 눌러 주세요');
+    }
+    render();
+  }
+  function judge(){
+    clearTimeout(idleTimer);
+    const ok = input === settings.code;
+    logAttempt(ok, level());
+    if (ok) {
+      state = 'success'; sfx.ok(); buzz([60, 40, 60]); say('문이 열렸어요'); render();
+      resetTimer = setTimeout(reset, 4800);
+    } else {
+      state = 'fail'; sfx.bad(); buzz(180); say('괜찮아요, 다시 해볼까요'); render();
+      resetTimer = setTimeout(reset, 3000);
+    }
+  }
+  function reset(){
+    clearTimeout(resetTimer); clearTimeout(idleTimer);
+    input = ''; state = settings.wake ? 'sleep' : 'ready';
+    render();
+    if (state === 'ready') armIdle();
+  }
+  function logAttempt(ok, lv){
+    const now = Date.now();
+    if (ok) {
+      prog.streak += 1;
+      if (settings.hint === 'auto' && prog.streak >= settings.autoStep && prog.level > 0) { prog.level -= 1; prog.streak = 0; }
+      prog.nextDue = now + INTERVALS[Math.min(prog.streak, INTERVALS.length - 1)] * 60000;
+    } else {
+      prog.streak = 0;
+      if (settings.hint === 'auto' && prog.level < 3) prog.level += 1;
+      prog.nextDue = now + 5 * 60000;
+    }
+    prog.log.push({t: now, ok: ok, lv: lv});
+    if (prog.log.length > 300) prog.log = prog.log.slice(-300);
+    store.set('dl_progress', prog);
+  }
+
+  // ── 키패드 만들기 ──
+  KEYS.forEach(k => {
+    const b = document.createElement('div');
+    b.className = 'key' + ((k === '*' || k === '#') ? ' sym' : '');
+    b.dataset.k = k; b.textContent = k;
+    keysEl.appendChild(b);
+  });
+  lockEl.addEventListener('pointerdown', e => {
+    e.preventDefault();
+    if (settingsOpen) return;
+    const key = e.target.closest('.key');
+    if (key && state !== 'sleep') { key.classList.add('pressed'); setTimeout(() => key.classList.remove('pressed'), 160); }
+    if (state === 'sleep') { wake(); return; }
+    if (key) press(key.dataset.k);
+  });
+  lockEl.addEventListener('touchmove', e => e.preventDefault(), {passive:false});
+  document.addEventListener('contextmenu', e => { if (!settingsOpen) e.preventDefault(); });
+  document.addEventListener('gesturestart', e => e.preventDefault());
+  document.addEventListener('visibilitychange', () => { if (document.hidden && 'speechSynthesis' in window) speechSynthesis.cancel(); });
+
+  // ── 설정 열기: 톱니 2초 길게 ──
+  let gearTimer = null;
+  gearEl.addEventListener('pointerdown', e => {
+    e.preventDefault(); gearEl.classList.add('hold');
+    gearTimer = setTimeout(() => { gearEl.classList.remove('hold'); openSettings(); }, 1500);
+  });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => gearEl.addEventListener(ev, () => { clearTimeout(gearTimer); gearEl.classList.remove('hold'); }));
+
+  function openSettings(){ settingsOpen = true; clearTimeout(idleTimer); fillSettings(); settingsEl.classList.remove('hidden'); }
+  function closeSettings(){ settingsOpen = false; settingsEl.classList.add('hidden'); reset(); }
+  $('closeS').addEventListener('click', closeSettings);
+  settingsEl.addEventListener('click', e => { if (e.target === settingsEl) closeSettings(); });
+
+  function segSet(id, v){ $(id).querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === v)); }
+  function fillSettings(){
+    $('sCode').value = settings.code; $('sCodeMsg').textContent = '';
+    $('sWake').checked = settings.wake;
+    segSet('sEnd', settings.endKey);
+    $('sHint').value = settings.hint;
+    $('sStep').value = String(settings.autoStep);
+    $('sSound').checked = settings.sound;
+    $('sVib').checked = settings.vibrate;
+    $('sVoice').checked = settings.voice;
+    renderStats();
+  }
+  const saveSettings = () => store.set('dl_settings', settings);
+
+  $('sCode').addEventListener('change', e => {
+    const v = e.target.value.replace(/\D/g, '');
+    if (v.length >= 4 && v.length <= 8) { settings.code = v; saveSettings(); $('sCodeMsg').textContent = ''; }
+    else $('sCodeMsg').textContent = '숫자 4~8자리로 넣어 주세요. 이전 번호를 그대로 둡니다.';
+    e.target.value = settings.code;
+  });
+  $('sWake').addEventListener('change', e => { settings.wake = e.target.checked; saveSettings(); });
+  $('sEnd').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    settings.endKey = b.dataset.v; segSet('sEnd', settings.endKey); saveSettings();
+  });
+  $('sHint').addEventListener('change', e => { settings.hint = e.target.value; saveSettings(); renderStats(); });
+  $('sStep').addEventListener('change', e => { settings.autoStep = Number(e.target.value); saveSettings(); });
+  $('sSound').addEventListener('change', e => { settings.sound = e.target.checked; saveSettings(); });
+  $('sVib').addEventListener('change', e => { settings.vibrate = e.target.checked; saveSettings(); });
+  $('sVoice').addEventListener('change', e => { settings.voice = e.target.checked; saveSettings(); });
+  $('sResetLevel').addEventListener('click', () => { prog.level = 3; prog.streak = 0; store.set('dl_progress', prog); renderStats(); });
+
+  let clearArmed = null;
+  $('sClearLog').addEventListener('click', e => {
+    if (clearArmed) {
+      clearTimeout(clearArmed); clearArmed = null;
+      prog.log = []; prog.nextDue = 0; store.set('dl_progress', prog);
+      e.target.textContent = '기록 지우기'; renderStats();
+    } else {
+      e.target.textContent = '정말 지울까요? 한 번 더 누르면 지워집니다';
+      clearArmed = setTimeout(() => { clearArmed = null; e.target.textContent = '기록 지우기'; }, 4000);
+    }
+  });
+  $('sFull').addEventListener('click', () => {
+    const el = document.documentElement;
+    const fn = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (fn) { try { fn.call(el); } catch(e){} }
+  });
+
+  function renderStats(){
+    const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
+    const today = prog.log.filter(e => e.t >= dayStart.getTime());
+    const todayOk = today.filter(e => e.ok).length;
+    const allOk = prog.log.filter(e => e.ok).length;
+    const lastOk = prog.log.slice().reverse().find(e => e.ok);
+    $('sLevelNow').textContent = settings.hint === 'auto'
+      ? LEVEL_NAME[prog.level] + ' (연속 성공 ' + prog.streak + '번)'
+      : LEVEL_NAME[Number(settings.hint)] + ' (고정)';
+    $('sStats').innerHTML =
+      '<div class="stat"><small>오늘 연습</small><b>' + today.length + '번</b><small>성공 ' + todayOk + '번</small></div>' +
+      '<div class="stat"><small>전체</small><b>' + prog.log.length + '번</b><small>성공 ' + allOk + '번</small></div>' +
+      '<div class="stat"><small>마지막 성공</small><b>' + (lastOk ? fmtDateTime(lastOk.t) : '–') + '</b></div>' +
+      '<div class="stat"><small>다음 연습 권장</small><b>' + (prog.nextDue ? fmtDateTime(prog.nextDue) : '–') + '</b></div>';
+    $('sLog').innerHTML = prog.log.slice(-12).reverse().map(e =>
+      '<div><span>' + fmtDateTime(e.t) + '</span><span>' + (e.ok ? '성공' : '다시') + ' · ' + e.lv + '단계</span></div>'
+    ).join('') || '<div><span>아직 기록이 없어요. 첫 연습을 시작해 보세요.</span></div>';
+  }
+
+  // ── 시작 ──
+  render();
+  if (state === 'ready') armIdle();
+})();
+</script>
+</body>
+</html>
