@@ -24,20 +24,34 @@
   #app{height:100%;display:flex;flex-direction:column;
     padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
     background:linear-gradient(180deg,var(--wall) 0%,var(--wall) 78%,var(--wall-deep) 100%);}
-  .top{display:flex;justify-content:space-between;align-items:center;padding:12px 20px 0;}
+  .top{display:flex;justify-content:space-between;align-items:center;padding:2px 14px 0;}
   .title{font-size:clamp(15px,2.2vmin,20px);color:var(--mute);font-weight:500;}
-  .gear{background:none;border:0;color:#B9B3A7;font-size:22px;padding:8px 12px;touch-action:none;border-radius:12px;}
+  .gear{position:relative;background:none;border:0;color:#B9B3A7;font-size:27px;
+    width:58px;height:58px;padding:0;display:flex;align-items:center;justify-content:center;
+    touch-action:none;border-radius:50%;}
   .gear.hold{color:var(--lit);background:rgba(92,200,255,.15);}
+  .gear::after{content:"";position:absolute;inset:4px;border-radius:50%;pointer-events:none;
+    border:3px solid var(--lit);opacity:0;transform:scale(.35);}
+  .gear.hold::after{animation:holdgrow 1.4s linear forwards;}
+  @keyframes holdgrow{from{opacity:.3;transform:scale(.35)}to{opacity:1;transform:scale(1)}}
 
   .stage{flex:1;display:flex;align-items:center;justify-content:center;gap:clamp(20px,6vmin,80px);padding:0 4vmin 3vmin;}
-  @media (orientation:portrait){ .stage{flex-direction:column;gap:clamp(12px,3vmin,28px);} }
+  @media (orientation:portrait){
+    .stage{flex-direction:column;gap:clamp(10px,2vmin,20px);}
+    :root{--k: min(13vmin, 8.6vh);}
+  }
 
   /* ── door ── */
   .doorwrap{display:flex;flex-direction:column;align-items:center;gap:10px;}
   .frame{position:relative;width:clamp(120px,24vmin,230px);height:clamp(220px,48vmin,440px);perspective:1100px;
     background:#B8AE9E;border:clamp(7px,1.3vmin,12px) solid #CFC6B7;border-bottom-width:0;border-radius:4px 4px 0 0;
     box-shadow:0 30px 50px -20px rgba(60,50,35,.35);}
-  @media (orientation:portrait){ .frame{width:clamp(96px,16vmin,150px);height:clamp(170px,32vmin,290px);} }
+  @media (orientation:portrait){ .frame{width:clamp(96px,16vmin,150px);height:min(clamp(150px,32vmin,290px),19vh);} }
+  @media (orientation:portrait) and (max-height:720px){          /* 작은 휴대폰 */
+    :root{--k: min(12vmin, 8vh);}
+    .frame{height:min(clamp(110px,26vmin,290px),15vh);}
+    .prompt{font-size:clamp(17px,3vmin,30px);}
+  }
   .doorway{position:absolute;inset:0;background:radial-gradient(ellipse at 35% 45%,#FFF6DC 0%,var(--light) 45%,#C9A468 100%);
     opacity:0;transition:opacity .9s ease .35s;}
   .open .doorway{opacity:1;}
@@ -143,7 +157,7 @@
 <div id="app">
   <header class="top">
     <div class="title">도어락 연습</div>
-    <button id="gear" class="gear" aria-label="설정 (2초 길게 누르기)">&#9881;</button>
+    <button id="gear" class="gear" aria-label="설정 (길게 누르기)">&#9881;</button>
   </header>
 
   <main class="stage">
@@ -221,7 +235,7 @@
       <section class="grp">
         <h3>화면</h3>
         <button id="sFull" class="btn">전체 화면으로</button>
-        <p class="hint">태블릿 크롬 메뉴에서 "홈 화면에 추가"를 누르면 앱처럼 열립니다. 이 설정 창은 오른쪽 위 톱니를 2초간 길게 누르면 열립니다.</p>
+        <p class="hint">태블릿 크롬 메뉴에서 "홈 화면에 추가"를 누르면 앱처럼 열립니다. 이 설정 창은 오른쪽 위 톱니바퀴를 1초 조금 넘게 꾹 누르면 열립니다. 잘 안 되면 톱니바퀴를 빠르게 다섯 번 두드려도 열립니다.</p>
       </section>
 
     </div>
@@ -234,7 +248,8 @@
   const KO = {'0':'영','1':'일','2':'이','3':'삼','4':'사','5':'오','6':'육','7':'칠','8':'팔','9':'구'};
   const INTERVALS = [5, 10, 20, 40, 60, 120, 240, 480]; // 분 — 간격 회상
   const LEVEL_NAME = {3:'3단계 · 다음 키를 밝게 알려줌', 2:'2단계 · 다음 키를 살짝 알려줌', 1:'1단계 · 번호만 보여줌', 0:'0단계 · 실제 도어락과 같게'};
-  const DEFAULTS = {code:'7812', wake:true, endKey:'#', hint:'auto', autoStep:3, sound:true, vibrate:true, voice:true};
+  const SETTINGS_VER = 2;
+  const DEFAULTS = {code:'7812', wake:true, endKey:'none', hint:'auto', autoStep:3, sound:true, vibrate:true, voice:true, v:SETTINGS_VER};
 
   // ── 저장 (태블릿 브라우저에 저장, 불가한 환경에서는 이 화면을 여는 동안만 유지) ──
   const mem = {};
@@ -242,7 +257,12 @@
     get(k, d){ try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch(e){ return k in mem ? mem[k] : d; } },
     set(k, v){ mem[k] = v; try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){} }
   };
-  let settings = Object.assign({}, DEFAULTS, store.get('dl_settings', {}));
+  // 이미 저장된 설정은 그대로 이어 쓰되, 끝 키는 한 번 '없음'으로 맞춰 준다
+  const saved = store.get('dl_settings', null);
+  let settings = Object.assign({}, DEFAULTS, saved || {});
+  if (saved && !(saved.v >= 2)) settings.endKey = 'none';
+  settings.v = SETTINGS_VER;
+  if (saved) store.set('dl_settings', settings);
   let prog = Object.assign({level:3, streak:0, nextDue:0, log:[]}, store.get('dl_progress', {}));
 
   let state = settings.wake ? 'sleep' : 'ready';   // sleep | ready | success | fail
@@ -451,17 +471,50 @@
   document.addEventListener('visibilitychange', () => { if (document.hidden && 'speechSynthesis' in window) speechSynthesis.cancel(); });
 
   // ── 설정 열기: 톱니 2초 길게 ──
-  let gearTimer = null;
-  gearEl.addEventListener('pointerdown', e => {
-    e.preventDefault(); gearEl.classList.add('hold');
-    gearTimer = setTimeout(() => { gearEl.classList.remove('hold'); openSettings(); }, 1500);
-  });
-  ['pointerup', 'pointercancel', 'pointerleave'].forEach(ev => gearEl.addEventListener(ev, () => { clearTimeout(gearTimer); gearEl.classList.remove('hold'); }));
+  const HOLD_MS = 1400, MOVE_TOL = 32, TAP_WINDOW = 4000, TAP_COUNT = 5;
+  let gearTimer = null, gearAt = null, gearTaps = [];
 
-  function openSettings(){ settingsOpen = true; clearTimeout(idleTimer); fillSettings(); settingsEl.classList.remove('hidden'); }
+  function gearStop(){
+    clearTimeout(gearTimer); gearTimer = null; gearAt = null;
+    gearEl.classList.remove('hold');
+  }
+  function gearStart(x, y){
+    if (settingsOpen) return;
+    gearStop();
+    gearAt = {x: x, y: y};
+    gearEl.classList.add('hold');
+    gearTimer = setTimeout(() => { gearStop(); openSettings(); }, HOLD_MS);
+    const now = Date.now();                          // 길게 누르기가 안 먹는 기기용 — 빠르게 다섯 번
+    gearTaps = gearTaps.filter(t => now - t < TAP_WINDOW); gearTaps.push(now);
+    if (gearTaps.length >= TAP_COUNT) { gearTaps = []; gearStop(); openSettings(); }
+  }
+  function gearMove(x, y){                           // 손이 크게 미끄러졌을 때만 취소
+    if (!gearAt) return;
+    if (Math.abs(x - gearAt.x) > MOVE_TOL || Math.abs(y - gearAt.y) > MOVE_TOL) gearStop();
+  }
+  if (window.PointerEvent) {
+    gearEl.addEventListener('pointerdown', e => { e.preventDefault(); gearStart(e.clientX, e.clientY); });
+    document.addEventListener('pointermove', e => gearMove(e.clientX, e.clientY));
+    document.addEventListener('pointerup', () => gearStop());
+  } else {
+    gearEl.addEventListener('touchstart', e => {
+      e.preventDefault(); const t = e.touches[0]; if (t) gearStart(t.clientX, t.clientY);
+    }, {passive:false});
+    document.addEventListener('touchmove', e => { const t = e.touches[0]; if (t) gearMove(t.clientX, t.clientY); });
+    ['touchend', 'touchcancel'].forEach(ev => document.addEventListener(ev, () => gearStop()));
+    gearEl.addEventListener('mousedown', e => { e.preventDefault(); gearStart(e.clientX, e.clientY); });
+    document.addEventListener('mouseup', () => gearStop());
+  }
+  gearEl.addEventListener('keydown', e => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openSettings(); }
+  });
+
+  let openedAt = 0;
+  function openSettings(){ settingsOpen = true; openedAt = Date.now(); clearTimeout(idleTimer); fillSettings(); settingsEl.classList.remove('hidden'); }
   function closeSettings(){ settingsOpen = false; settingsEl.classList.add('hidden'); reset(); }
   $('closeS').addEventListener('click', closeSettings);
-  settingsEl.addEventListener('click', e => { if (e.target === settingsEl) closeSettings(); });
+  // 창을 연 그 손가락의 click이 배경에 떨어져 바로 닫히는 것을 막는다
+  settingsEl.addEventListener('click', e => { if (e.target === settingsEl && Date.now() - openedAt > 500) closeSettings(); });
 
   function segSet(id, v){ $(id).querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.v === v)); }
   function fillSettings(){
