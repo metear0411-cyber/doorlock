@@ -248,8 +248,8 @@
   const KO = {'0':'영','1':'일','2':'이','3':'삼','4':'사','5':'오','6':'육','7':'칠','8':'팔','9':'구'};
   const INTERVALS = [5, 10, 20, 40, 60, 120, 240, 480]; // 분 — 간격 회상
   const LEVEL_NAME = {3:'3단계 · 다음 키를 밝게 알려줌', 2:'2단계 · 다음 키를 살짝 알려줌', 1:'1단계 · 번호만 보여줌', 0:'0단계 · 실제 도어락과 같게'};
-  const SETTINGS_VER = 2;
-  const DEFAULTS = {code:'7812', wake:true, endKey:'none', hint:'auto', autoStep:3, sound:true, vibrate:true, voice:true, v:SETTINGS_VER};
+  const SETTINGS_VER = 3;
+  const DEFAULTS = {code:'5264', wake:true, endKey:'none', hint:'auto', autoStep:3, sound:true, vibrate:true, voice:true, v:SETTINGS_VER};
 
   // ── 저장 (태블릿 브라우저에 저장, 불가한 환경에서는 이 화면을 여는 동안만 유지) ──
   const mem = {};
@@ -261,6 +261,8 @@
   const saved = store.get('dl_settings', null);
   let settings = Object.assign({}, DEFAULTS, saved || {});
   if (saved && !(saved.v >= 2)) settings.endKey = 'none';
+  // 예전 기본 비밀번호(7812)를 그대로 쓰던 기기는 새 기본값으로 한 번만 맞춰 준다
+  if (saved && !(saved.v >= 3) && settings.code === '7812') settings.code = DEFAULTS.code;
   settings.v = SETTINGS_VER;
   if (saved) store.set('dl_settings', settings);
   let prog = Object.assign({level:3, streak:0, nextDue:0, log:[]}, store.get('dl_progress', {}));
